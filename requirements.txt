@@ -1,0 +1,18 @@
+# ============================================================
+# SEOWON-AUTO ENGINE v2.0 — 의존성 선언
+# ============================================================
+#
+# 핵심 엔진 (zero_server.py):
+#   pip 패키지 ZERO — Python 표준 라이브러리만 사용
+#   Python 3.8+ 필요
+#
+# 선택적 기능 (로컬 실행, 클라우드 의존성 없음):
+#   TTS 엔진:  pip install TTS          (XTTS v2, 로컬 전용)
+#   XTTS API:  pip install xtts-api-server
+#
+# YouTube 업로드 (선택, oauth2 직접 구현 대체 가능):
+#   pip install google-api-python-client google-auth-oauthlib
+#
+# ============================================================
+# 현재 설치 필요: NOTHING (zero_server.py 기준)
+# ============================================================

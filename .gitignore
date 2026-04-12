@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# 데이터/출력 (로컬 전용)
+data/jobs.json
+workspace/
+output/
+
+# 환경변수
+.env
+*.env
+token.json
+
+# 에디터
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
