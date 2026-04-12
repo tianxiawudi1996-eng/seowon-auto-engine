@@ -3,16 +3,19 @@ SEOWON-AUTO ENGINE — Zero-Dependency Server
 ============================================
 pip 패키지 ZERO. Python 표준 라이브러리만 사용.
 
+AI 엔진: Google Gemini API (무료 월 1,500회)
+  - gemini-2.0-flash 모델 사용
+  - API 키 발급: https://aistudio.google.com/app/apikey
+
 stdlib 스택:
   - http.server + socketserver  → REST API 서버
-  - urllib.request              → Claude API / YouTube API 호출
+  - urllib.request              → Gemini API / YouTube API 호출
   - json                        → 파일 DB + 상태 관리
-  - sqlite3                     → 히스토리 영구 저장
   - threading                   → 비동기 파이프라인
   - uuid, pathlib, datetime     → 유틸리티
 
 실행:
-  python zero_server.py --port 8000 --api-key YOUR_ANTHROPIC_KEY
+  python zero_server.py --port 8000 --api-key YOUR_GOOGLE_API_KEY
 """
 
 import http.server
@@ -83,41 +86,53 @@ jobs_db    = JsonDB(ROOT / "data" / "jobs.json")
 config_db  = JsonDB(ROOT / "data" / "config.json")
 
 
-# ── Claude API 클라이언트 (urllib만 사용) ─────────────────────────────────────
-class ClaudeClient:
-    """anthropic SDK 없이 urllib로 Claude API 직접 호출"""
+# ── Gemini API 클라이언트 (urllib만 사용) ─────────────────────────────────────
+class GeminiClient:
+    """
+    Google Gemini API — urllib 직접 호출 (pip 패키지 ZERO)
+    모델: gemini-2.0-flash (무료 월 1,500회)
+    키 발급: https://aistudio.google.com/app/apikey
+    """
 
-    API_URL = "https://api.anthropic.com/v1/messages"
-    MODEL   = "claude-sonnet-4-20250514"
+    MODEL = "gemini-2.0-flash"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
+        self.url     = (
+            f"https://generativelanguage.googleapis.com"
+            f"/v1beta/models/{self.MODEL}:generateContent?key={api_key}"
+        )
 
     def chat(self, system: str, user: str, max_tokens: int = 2500) -> str:
         payload = json.dumps({
-            "model":      self.MODEL,
-            "max_tokens": max_tokens,
-            "system":     system,
-            "messages":   [{"role": "user", "content": user}],
+            "system_instruction": {
+                "parts": [{"text": system}]
+            },
+            "contents": [
+                {"role": "user", "parts": [{"text": user}]}
+            ],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature":     0.7,
+            },
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            self.API_URL,
+            self.url,
             data=payload,
             method="POST",
-            headers={
-                "Content-Type":      "application/json",
-                "x-api-key":         self.api_key,
-                "anthropic-version": "2023-06-01",
-            },
+            headers={"Content-Type": "application/json"},
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                return data["content"][0]["text"]
+                return data["candidates"][0]["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8")
-            raise RuntimeError(f"Claude API 오류 {e.code}: {body}")
+            raise RuntimeError(f"Gemini API 오류 {e.code}: {body}")
+
+# 하위 호환 — Pipeline 내부에서 ClaudeClient 이름 그대로 사용 가능
+ClaudeClient = GeminiClient
 
 
 # ── CapCut JSON 빌더 (완전 독립) ──────────────────────────────────────────────
@@ -634,7 +649,7 @@ def run_server(port: int, api_key: str):
         d.mkdir(parents=True, exist_ok=True)
 
     # Claude 클라이언트 주입
-    EngineHandler.claude_client = ClaudeClient(api_key)
+    EngineHandler.claude_client = GeminiClient(api_key)
 
     # 서버 시작
     class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
@@ -643,7 +658,7 @@ def run_server(port: int, api_key: str):
     server = ThreadedServer(("0.0.0.0", port), EngineHandler)
     log.info(f"🚀 SEOWON-AUTO ENGINE 서버 시작 — http://localhost:{port}")
     log.info(f"   pip 패키지: ZERO | Python stdlib 전용")
-    log.info(f"   Claude API: {ClaudeClient.API_URL}")
+    log.info(f"   AI 엔진: Google Gemini 2.0 Flash (무료 월 1,500회)")
     log.info(f"   출력 디렉토리: {OUTPUT_DIR}")
     log.info(f"   Ctrl+C 로 종료")
 
@@ -658,11 +673,14 @@ def run_server(port: int, api_key: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SEOWON-AUTO ENGINE — Zero-Dependency Server")
     parser.add_argument("--port",    type=int, default=8000)
-    parser.add_argument("--api-key", default=os.environ.get("ANTHROPIC_API_KEY", ""))
+    parser.add_argument("--api-key", default=os.environ.get("GOOGLE_API_KEY", ""))
     args = parser.parse_args()
 
     if not args.api_key:
-        print("❌ API 키 필요: --api-key YOUR_KEY 또는 ANTHROPIC_API_KEY 환경변수")
+        print("❌ Google API 키 필요!")
+        print("   발급: https://aistudio.google.com/app/apikey")
+        print("   실행: python zero_server.py --api-key YOUR_KEY")
+        print("   또는: export GOOGLE_API_KEY=YOUR_KEY")
         sys.exit(1)
 
     run_server(args.port, args.api_key)
