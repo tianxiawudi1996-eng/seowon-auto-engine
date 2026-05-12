@@ -24,3 +24,11 @@ token.json
 # OS
 .DS_Store
 Thumbs.db
+
+# 마스터 패키지 - 환경 변수 및 로컬 데이터
+.env
+.seowon/
+data/batch_queue.json
+data/jobs.json
+logs/
+*.log
